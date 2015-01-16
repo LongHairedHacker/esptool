@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 #
 # ESP8266 ROM Bootloader Utility
 # https://github.com/themadinventor/esptool
@@ -41,8 +41,8 @@ class FtdiPort:
 	def write(self, data):
 		self._device.write(data)
 
-	def read(self, lenght):
-		retries = round(timeout * 10)
+	def read(self, length):
+		retries = round(self._timeout * 10)
 		data = self._device.read(length)
 		while not data and retries > 0:
 			time.sleep(0.1)
@@ -59,7 +59,7 @@ class FtdiPort:
 	def flush_input(self):
 		self._device.flush_input()
 	
-	def flush_input(self):
+	def flush_output(self):
 		self._device.flush_output()
 
 	def enter_bootloader(self):
@@ -77,8 +77,8 @@ class PySerialPort:
 	def __init__(self, port, baud):
 		self._serial = serial.Serial(port, baud)
 	
-	def read(self, lenght):
-		return self._serial.read(lenght)
+	def read(self, length):
+		return self._serial.read(length)
 
 	def write(self, data):
 		self._serial.write(data)
@@ -92,7 +92,7 @@ class PySerialPort:
 	def flush_input(self):
 		self._serial.flushInput()
 	
-	def flush_input(self):
+	def flush_output(self):
 		self._serial.flushOutput()
 
 	def enter_bootloader(self):
@@ -221,12 +221,14 @@ class ESPROM:
 		self._port.set_timeout(0.5)
 		for i in xrange(10):
 			try:
-				self._port.flushInput()
-				self._port.flushOutput()
+				# Warning do not make any typos here,
+				# the except below will eat the errors
+				self._port.flush_input()
+				self._port.flush_output()
 				self.sync()
 				self._port.set_timeout(5)
 				return
-			except:
+			except :
 				time.sleep(0.1)
 		raise Exception('Failed to connect')
 
@@ -395,6 +397,8 @@ def arg_auto_int(x):
 	return int(x, 0)
 
 if __name__ == '__main__':
+	pylibftdi.USB_PID_LIST.append(0x6015)
+
 	parser = argparse.ArgumentParser(description = 'ESP8266 ROM Bootloader Utility', prog = 'esptool')
 
 	parser.add_argument(
