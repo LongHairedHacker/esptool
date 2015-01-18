@@ -24,8 +24,9 @@ setup(
         'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
         'Programming Language :: Python :: 2.7',
     ],
+	dependency_links=['https://github.com/eblot/pyftdi/archive/v0.10.0.tar.gz#egg=pyftdi-0.10.0'],
     install_requires=[
-        'pyserial', 'pylibftdi',
+        'pyserial', 'pyftdi==0.10.0',
     ],
     scripts=[
         'esptool.py',

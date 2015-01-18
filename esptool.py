@@ -25,29 +25,36 @@ import time
 import argparse
 import os
 import subprocess
-import pylibftdi
+import traceback
 
+from pyftdi.pyftdi import ftdi
 
 class FtdiPort:
 	def __init__(self, port, baud):
+		# Hacky external fix for https://github.com/eblot/pyftdi/issues/26
+		ftdi.Ftdi.BITMODE_MASK = 0x7F
+
+		self._device = ftdi.Ftdi()
+
 		if port:
-			self._device = pylibftdi.Device(port)
+			self._device.open(0x0403, 0x6015, 0, serial=port)
 		else:
-			self._device = pylibftdi.Device()
-		self._device.baudrate = baud
+			self._device.open(0x0403, 0x6015, 0)
+
+		self._device.set_baudrate(baud)
 
 		self._timeout = 0
 
 	def write(self, data):
-		self._device.write(data)
+		self._device.write_data(data)
 
 	def read(self, length):
 		retries = round(self._timeout * 10)
-		data = self._device.read(length)
+		data = self._device.read_data(length)
 		while not data and retries > 0:
 			time.sleep(0.1)
 			retries -= 1
-			data = self._device.read(length)
+			data = self._device.read_data(length)
 		return data
 
 	def set_timeout(self, timeout):
@@ -57,20 +64,25 @@ class FtdiPort:
 		return self._timeout
 
 	def flush_input(self):
-		self._device.flush_input()
-	
+		self._device.purge_rx_buffer()
+
 	def flush_output(self):
-		self._device.flush_output()
+		self._device.purge_tx_buffer()
 
 	def enter_bootloader(self):
 		# 0x20 = CBUS BitBang 
 		# Set CBUS2 low
-		self._device.ftdi_fn.ftdi_set_bitmode(0b01000000, 0x20)
-		time.sleep(0.100)
+		self._device.set_bitmode(0b01000000, ftdi.Ftdi.BITMODE_CBUS)
+		time.sleep(0.050)
 		#Set CBUS2 high
-		self._device.ftdi_fn.ftdi_set_bitmode(0b01000100, 0x20)
+		self._device.set_bitmode(0b01000100, ftdi.Ftdi.BITMODE_CBUS)
 		#Resume normal operation
-		self._device.ftdi_fn.ftdi_set_bitmode(0, 0x00)
+		self._device.set_bitmode(0x00, ftdi.Ftdi.BITMODE_RESET)
+
+	def close(self):
+		self._device.close()
+		self._device.usb_dev.attach_kernel_driver(0)
+
 
 
 class PySerialPort:
@@ -103,6 +115,9 @@ class PySerialPort:
 		self._serial.setRTS(False)
 		time.sleep(0.1)
 		self._serial.setDTR(False)
+
+	def close(self):
+		self._serial.close()
 
 
 class ESPROM:
@@ -142,7 +157,7 @@ class ESPROM:
 
 			self._port = PySerialPort(port, baud)
 		else:
-			print "Using libftdi"
+			print "Using pyftdi"
 			self._port = FtdiPort(port, baud)
 
 	""" Read bytes from the serial port while performing SLIP unescaping """
@@ -228,7 +243,7 @@ class ESPROM:
 				self.sync()
 				self._port.set_timeout(5)
 				return
-			except :
+			except:
 				time.sleep(0.1)
 		raise Exception('Failed to connect')
 
@@ -305,6 +320,9 @@ class ESPROM:
 		flash_id = esp.read_reg(0x60000240)
 		self.flash_finish(False)
 		return flash_id
+
+	def close_port(self):
+		self._port.close()
 
 class ESPFirmwareImage:
 	
@@ -397,8 +415,6 @@ def arg_auto_int(x):
 	return int(x, 0)
 
 if __name__ == '__main__':
-	pylibftdi.USB_PID_LIST.append(0x6015)
-
 	parser = argparse.ArgumentParser(description = 'ESP8266 ROM Bootloader Utility', prog = 'esptool')
 
 	parser.add_argument(
@@ -601,3 +617,6 @@ if __name__ == '__main__':
 		flash_id = esp.flash_id()
 		print 'Manufacturer: %02x' % (flash_id & 0xff)
 		print 'Device: %02x%02x' % ((flash_id >> 8) & 0xff, (flash_id >> 16) & 0xff)
+
+	if esp:
+		esp.close_port()
