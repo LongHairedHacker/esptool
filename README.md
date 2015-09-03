@@ -5,11 +5,31 @@ It is intended to be a simple, platform independent, open source replacement for
 
 This is a work in progress; it is usable but expect some rough edges.
 
+## Installation / dependencies
+
+esptool depends on [pySerial](http://pyserial.sourceforge.net/) for serial communication
+with the target device.
+
+If you choose to install esptool system-wide by running `python setup.py install`, then
+this will be taken care of automatically.
+
+If not using `setup.py`, then you'll have to install pySerial manually
+by running something like `pip install pyserial`, `easy_install pyserial` or `apt-get install python-serial`,
+depending on your platform. (The official pySerial installation instructions are
+[here](http://pyserial.sourceforge.net/pyserial.html#installation)).
+
 ## Usage
 
 This utility actually have a user interface! It uses [Argparse](https://docs.python.org/dev/library/argparse.html)
-and is rather self-documenting. Try running `esptool -h`.
+and is rather self-documenting. Try running `esptool -h`, `esptool write_flash -h`, etc.
 Or hack the script to your hearts content.
+
+### Ports
+
+The serial port is selected using the `-p` option, like `-p /dev/ttyUSB0` (on unixen like Linux and OSX) or `-p COM1`
+(on Windows). The perhaps not so obvious corner case here is when you run esptool in Cygwin on Windows, where you have to convert the Windows-style name into an Unix-style path (`COM1` -> `/dev/ttyS0`, and so on).
+
+The baudrate may be set using `-b 921600` (or another baudrate of your choice) to speed up large transfers.
 
 ### Examples
 Typical usage:
@@ -34,6 +54,18 @@ Dumping the ROM (64 KiB) from the chip:
 ```
 ./esptool.py dump_mem 0x40000000 65536 iram0.bin
 ```
+
+Reading the MAC Address:
+```
+./esptool.py read_mac
+```
+
+Reading the SPI Flash ID:
+```
+./esptool.py flash_id
+```
+
+Refer to [flashrom source code](http://code.coreboot.org/p/flashrom/source/tree/HEAD/trunk/flashchips.h) for flash chip manufacturer name and part number.
 
 Note that this document may be out of date. Use the built-in usage (`esptool -h`) when in doubt.
 
@@ -105,9 +137,11 @@ Byte	| Description
 0	| Always `0xE9`
 1	| Number of segments
 2	| SPI Flash Interface (`0` = QIO, `1` = QOUT, `2` = DIO, `0x3` = DOUT)
-3	| High four bits: `0` = 512K, `1` = 256K, `2` = 1M, `3` = 2M, `4` = 4M, Low four bits: `0` = 40MHz, `1`= 26MHz, `2` = 20MHz, `0x3` = 80MHz
+3	| High four bits: `0` = 512K, `1` = 256K, `2` = 1M, `3` = 2M, `4` = 4M, Low four bits: `0` = 40MHz, `1`= 26MHz, `2` = 20MHz, `0xf` = 80MHz
 4-7	| Entry point
 8-n	| Segments
+
+esptool overrides the 2nd and 3rd (start from 0) bytes according to the SPI flash info provided through command line option, regardless of corresponding bytes from the input .bin file that will be written to address 0x00000. So you must provide SPI flash info when running `esptool write_flash` command. For example `esptool write_flash -ff 80m -fm qio -fs 8m 0x00000 boot.bin 0x01000 user1.bin`
 
 ### Segment
 
