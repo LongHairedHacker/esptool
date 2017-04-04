@@ -91,11 +91,9 @@ setup(
         'pyaes',
         'ecdsa',
     ],
-    entry_points={
-        'console_scripts': [
-            'esptool.py=esptool:_main',
-            'espsecure.py=espsecure:_main',
-            'espefuse.py=espefuse:_main',
-        ],
-    },
+    scripts=[
+        'esptool.py',
+        'espsecure.py',
+        'espefuse.py',
+    ],
 )
