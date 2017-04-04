@@ -39,9 +39,6 @@ MAX_UINT24 = 0xffffff
 
 class FtdiPort:
     def __init__(self, port, baud):
-        # Hacky external fix for https://github.com/eblot/pyftdi/issues/26
-        ftdi.Ftdi.BITMODE_MASK = 0x7F
-
         self._device = ftdi.Ftdi()
 
         if port != ESPLoader.DEFAULT_PORT:
@@ -100,9 +97,17 @@ class FtdiPort:
         return 0
 
     def close(self):
-        self._device.close()
-        self._device.usb_dev.attach_kernel_driver(0)
+        closed = False
 
+        while not closed:
+            try:
+                self._device.close()
+                self._device.usb_dev.attach_kernel_driver(0)
+                closed = True
+            except:
+                print("Closing port failed ... retrying")
+
+        print("Closed port")
 
 
 class PySerialPort:
@@ -890,6 +895,9 @@ class ESPLoader(object):
                 # running user code from stub loader requires some hacks
                 # in the stub loader
                 self.command(self.ESP_RUN_USER_CODE, wait_response=False)
+
+    def close_port(self):
+        self._port.close()
 
 
 class ESP8266ROM(ESPLoader):
@@ -2208,6 +2216,9 @@ def main():
             print('Staying in bootloader.')
             if esp.IS_STUB:
                 esp.soft_reset(True)  # exit stub back to ROM loader
+
+
+        esp.close_port()
 
     else:
         operation_func(args)
